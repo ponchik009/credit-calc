@@ -1,39 +1,46 @@
+/* переменные */
+:root {
+  --base: #e4b233;
+}
+
+/* base reset */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+
+  transition: background 0.4s, background-color 0.4s;
+}
+
+button {
+  border: none;
+  outline: none;
+  background: transparent;
+}
+
+a {
+  text-decoration: none;
+}
+
+/* общая разметка */
 .App {
-  text-align: center;
-}
+  display: grid;
+  grid-template-columns: 1fr 1fr;
 
-.App-logo {
-  height: 40vmin;
-  pointer-events: none;
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-float infinite 3s ease-in-out;
-  }
-}
-
-.App-header {
+  min-width: 100%;
   min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  font-size: calc(10px + 2vmin);
+
+  padding-left: calc(100vw - 100%);
 }
 
-.App-link {
-  color: rgb(112, 76, 182);
+.App > .left {
+  padding: 100px 60px;
 }
 
-@keyframes App-logo-float {
-  0% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(10px);
-  }
-  100% {
-    transform: translateY(0px);
-  }
+.App > .right {
+  padding: 100px 60px;
+}
+
+.left {
+  border-right: 1px solid var(--base);
 }
