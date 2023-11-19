@@ -1,5 +1,7 @@
 # Приложение для расчета ипотеки
 
+<a href="https://credit.babyjohn.tech/" target="_blank">https://credit.babyjohn.tech/</a>
+
 ## Функции
 
 <ul>
