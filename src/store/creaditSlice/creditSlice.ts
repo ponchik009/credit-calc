@@ -5,15 +5,15 @@ import {
   PayloadAction,
 } from "@reduxjs/toolkit";
 
-import { RootState, AppThunk } from "../../store/store";
+import { RootState } from "../../store/store";
 import {
   AmountDisplayType,
-  countCredit,
-  CreditSummary,
+  CreditOptions,
   EarlyPayment,
   PaymentSchedule,
 } from "../../utils/countCredit";
 import { Storage } from "../../utils/localStorage";
+import { Api } from "../../api/api";
 
 export interface CreditState {
   // сумма кредита
@@ -36,6 +36,9 @@ export interface CreditState {
 
   // ранние платежи
   earlyPayments: Map<string, EarlyPayment> | null;
+
+  // creditSummaryLoading
+  loading: boolean;
 }
 
 const initialState: CreditState = {
@@ -68,7 +71,31 @@ const initialState: CreditState = {
         ]
       )
     ) || null,
+
+  loading: false,
 };
+
+export const countCreditSummaryAsync = createAsyncThunk(
+  "credit/countCredit",
+  async (_, thunkApi) => {
+    const state = (thunkApi.getState() as RootState).credit;
+
+    if (state.dateStart && state.sum && state.duration && state.percent) {
+      const summary = await Api.creditApi.calc({
+        amountDisplayType: AmountDisplayType.PER_MONTH,
+        dateStart: state.dateStart,
+        dur: state.duration,
+        percent: state.percent,
+        sum: state.sum,
+        earlyPayments: state.earlyPayments || new Map(),
+      });
+
+      return summary;
+    }
+
+    throw new Error("Не прошла валидация!");
+  }
+);
 
 export const counterSlice = createSlice({
   name: "credit",
@@ -140,50 +167,52 @@ export const counterSlice = createSlice({
         );
       }
     },
-    countCreditSummary: (state) => {
-      if (state.dateStart && state.sum && state.duration && state.percent) {
-        const summary = countCredit({
-          amountDisplayType: AmountDisplayType.PER_MONTH,
-          dateStart: state.dateStart,
-          dur: state.duration,
-          percent: state.percent,
-          sum: state.sum,
-          earlyPayments: state.earlyPayments || new Map(),
-        });
+  },
+  extraReducers(builder) {
+    builder.addCase(countCreditSummaryAsync.pending, (state) => {
+      state.loading = true;
+    });
 
-        const summaryMap = new Map<number, PaymentSchedule[]>();
+    builder.addCase(countCreditSummaryAsync.rejected, (state) => {
+      state.loading = false;
+    });
 
-        summary.payments.forEach((payment) => {
-          const year = new Date(
-            payment.date.split(".").reverse().join("-")
-          ).getFullYear();
+    builder.addCase(countCreditSummaryAsync.fulfilled, (state, action) => {
+      state.loading = false;
 
-          if (summaryMap.has(year)) {
-            summaryMap.get(year)?.push(payment);
-          } else {
-            summaryMap.set(year, [payment]);
-          }
-        });
+      const summary = action.payload;
+      const summaryMap = new Map<number, PaymentSchedule[]>();
 
-        state.creditSummary = summaryMap;
+      summary.payments.forEach((payment) => {
+        const year = new Date(
+          payment.date.split(".").reverse().join("-")
+        ).getFullYear();
 
-        // года по убыванию
-        const years = Array.from(summaryMap?.keys() || []).sort(
-          (k1, k2) => k2 - k1
-        );
-        // дата окончания кредита
-        const lastYear = summaryMap.get(years[0]);
-        const firstYear = summaryMap.get(years?.at(-1) || 0);
-        const dateEnd = lastYear?.at(-1)?.date;
-        state.dateEnd = dateEnd || null;
-        // сумма месячного платежа
-        state.basePayment = summary.basePayments[0].amount || 0;
-        // выплата по процентам
-        state.totalPercentSum = summary.totalPercents;
-        // общая выплата
-        state.totalPaidSum = summary.totalSum;
-      }
-    },
+        if (summaryMap.has(year)) {
+          summaryMap.get(year)?.push(payment);
+        } else {
+          summaryMap.set(year, [payment]);
+        }
+      });
+
+      state.creditSummary = summaryMap;
+
+      // года по убыванию
+      const years = Array.from(summaryMap?.keys() || []).sort(
+        (k1, k2) => k2 - k1
+      );
+      // дата окончания кредита
+      const lastYear = summaryMap.get(years[0]);
+      const firstYear = summaryMap.get(years?.at(-1) || 0);
+      const dateEnd = lastYear?.at(-1)?.date;
+      state.dateEnd = dateEnd || null;
+      // сумма месячного платежа
+      state.basePayment = summary.basePayments[0].amount || 0;
+      // выплата по процентам
+      state.totalPercentSum = summary.totalPercents;
+      // общая выплата
+      state.totalPaidSum = summary.totalSum;
+    });
   },
 });
 
@@ -195,7 +224,6 @@ export const {
   updateDateStart,
   addEarlyPayment,
   removeEarlyPayment,
-  countCreditSummary,
 } = counterSlice.actions;
 
 const selectCredit = (state: RootState) => state.credit;
@@ -220,5 +248,10 @@ export const selectSummary = createSelector([selectCredit], (creditState) => ({
   totalPercentSum: creditState.totalPercentSum,
   totalPaidSum: creditState.totalPaidSum,
 }));
+
+export const selectPendingStatus = createSelector(
+  [selectCredit],
+  (creditState) => creditState.loading
+);
 
 export default counterSlice.reducer;

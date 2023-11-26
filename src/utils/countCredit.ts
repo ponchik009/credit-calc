@@ -17,7 +17,7 @@ export enum EarlyPaymentType {
   DURATION_REDUCTION,
 }
 
-interface CreditOptions {
+export interface CreditOptions {
   sum: number;
   // Длительность в годах
   dur: number;
